@@ -85,35 +85,46 @@ const Board = ({
 
   return (
     <div className="space-y-2">
-      {/* Past guesses */}
-      {guesses.map((guessWord, rowIndex) => (
-        <Row
-          key={rowIndex}
-          letters={guessWord.split('')}
-          statuses={calculateStatuses(guessWord, targetWord)}
-          index={rowIndex}
-          currentRow={currentRow}
-          guess={guess}
-          setGuess={setGuess}
-          submitGuess={submitGuess}
-          words={words}
-          flipped={flippedRows.has(rowIndex)}
-        />
-      ))}
+      {/* Render exactly maxAttempts rows */}
+      {Array.from({ length: maxAttempts }, (_, i) => {
+        // Determine the guess word for this row
+        let guessWord = '';
+        if (i < guesses.length) {
+          guessWord = guesses[i];
+        } else if (i === currentRow) {
+          guessWord = guess;
+        }
+        // else guessWord remains empty string
 
-      {/* Current row for input */}
-      <Row
-        letters={guess.split('')}
-        statuses={Array(5).fill('')}
-        index={currentRow}
-        currentRow={currentRow}
-        guess={guess}
-        setGuess={setGuess}
-        submitGuess={submitGuess}
-        words={words}
-        invalidWord={invalidWord && !solvedBoard && currentRow === guesses.length} // Only show shake for current row if invalid
-        flipped={false} // Current row doesn't flip until submitted
-      />
+        // Determine statuses for this row
+        const statuses =
+          i < guesses.length
+            ? calculateStatuses(guessWord, targetWord)
+            : Array(5).fill('');
+
+        // Determine if this row should shake (invalid word on current row)
+        const showShake =
+          invalidWord && !solvedBoard && i === currentRow;
+
+        // Determine if this row is flipped (only completed guesses flip)
+        const isFlipped = flippedRows.has(i);
+
+        return (
+          <Row
+            key={i}
+            letters={guessWord.split('')}
+            statuses={statuses}
+            index={i}
+            currentRow={currentRow}
+            guess={guessWord}
+            setGuess={setGuess}
+            submitGuess={submitGuess}
+            words={words}
+            invalidWord={showShake}
+            flipped={isFlipped}
+          />
+        );
+      })}
 
       {/* Win/Lost indicator for this specific board */}
       {solvedBoard && (
