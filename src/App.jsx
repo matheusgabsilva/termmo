@@ -27,6 +27,12 @@ function App() {
     getRemainingAttempts
   } = useGameLogic(mode);
 
+  // Add keyboard listener for physical keyboard
+  React.useEffect(() => {
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [handleKeyPress]);
+
   // Determine mode label
   const modeLabels = {
     termo: 'Termo (1 tabuleiro)',
@@ -50,9 +56,9 @@ function App() {
             {/* Responsive grid layout based on mode and screen size */}
             <div className={
               `grid gap-4 ` +
-              (mode === 'dueto' ? 'grid-cols-1 md:grid-cols-2' : '') +
+              (mode === 'dueto'    ? 'grid-cols-1 md:grid-cols-2' : '') +
               (mode === 'quarteto' ? 'grid-cols-1 md:grid-cols-2' : '') +
-              (mode === 'termo' : 'grid-cols-1')
+              (mode === 'termo'    ? 'grid-cols-1' : '')
             }>
               {targetWordsOriginal.map((targetWordOriginal, boardIndex) => (
                 <Board

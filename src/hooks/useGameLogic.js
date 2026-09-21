@@ -127,7 +127,7 @@ const useGameLogic = (mode = 'termo') => {
       }
 
       // Check if this board is now solved
-      if (guess.toLowerCase() === targetWord) {
+      if (normalizedGuess === targetWord) {
         newSolvedBoards[boardIndex] = true;
       } else {
         // Move to next row for this board
@@ -143,7 +143,7 @@ const useGameLogic = (mode = 'termo') => {
       setSolvedBoards(newSolvedBoards);
 
       // Check win/lose conditions
-      const allBoardsSolved = solvedBoards.every(solved => solved);
+      const allBoardsSolved = newSolvedBoards.every(solved => solved);
       const attemptsExhausted = currentRows.some((row, index) =>
         !solvedBoards[index] && row >= maxAttempts
       );
