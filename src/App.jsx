@@ -57,7 +57,7 @@ function App() {
             <div className={
               `grid gap-4 ` +
               (mode === 'dueto'    ? 'grid-cols-1 md:grid-cols-2' : '') +
-              (mode === 'quarteto' ? 'grid-cols-1 md:grid-cols-2' : '') +
+              (mode === 'quarteto' ? 'grid-cols-2 lg:grid-cols-4' : '') +
               (mode === 'termo'    ? 'grid-cols-1' : '')
             }>
               {targetWordsOriginal.map((targetWordOriginal, boardIndex) => (
