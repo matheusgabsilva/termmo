@@ -18,22 +18,33 @@ const Row = ({ letters, statuses, index, currentRow, guess, setGuess, submitGues
     }
   };
 
-  return (
-    <div className={`flex space-x-1 mb-2 ${invalidWord && index === currentRow ? 'animate-shake' : ''} ${flipped ? 'flip-animation' : ''}`}>
-      {letters.map((letter, i) => (
+  // Ensure we always have 5 columns
+  const renderCells = () => {
+    const cells = [];
+    for (let i = 0; i < 5; i++) {
+      const letter = letters[i] ?? '';
+      const status = statuses[i] ?? '';
+      cells.push(
         <div
           key={i}
-          className={`w-10 h-10 flex items-center justify-center text-lg font-bold rounded border border-gray-300 ${statuses[i] === 'correct'
+          className={`w-10 h-10 flex items-center justify-center text-lg font-bold rounded border border-gray-300 ${status === 'correct'
             ? 'bg-green-500 text-white'
-            : statuses[i] === 'present'
+            : status === 'present'
             ? 'bg-yellow-500 text-white'
-            : statuses[i] === 'absent'
+            : status === 'absent'
             ? 'bg-gray-300 text-black'
             : 'bg-white text-gray-600'} transition-all duration-300 ${index === currentRow && guess.length > i ? 'animate-pulse' : ''} ${flipped ? 'flip-in-horizontal' : ''}`}
         >
-          {letter || ''}
+          {letter}
         </div>
-      ))}
+      );
+    }
+    return cells;
+  };
+
+  return (
+    <div className={`flex space-x-1 mb-2 ${invalidWord && index === currentRow ? 'animate-shake' : ''} ${flipped ? 'flip-animation' : ''}`}>
+      {renderCells()}
     </div>
   );
 };
