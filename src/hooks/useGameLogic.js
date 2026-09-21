@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { removeAccents } from '../utils/normalize.js';
 import wordsData from '../data/words.json';
 
@@ -158,7 +158,8 @@ const useGameLogic = (mode = 'termo') => {
     }
   };
 
-  const handleKeyPress = (e) => {
+  // handleKeyPress with functional updates to avoid stale closure
+  const handleKeyPress = useCallback((e) => {
     if (gameStatus !== 'playing') return;
 
     if (e.key === 'Enter') {
@@ -166,11 +167,11 @@ const useGameLogic = (mode = 'termo') => {
         submitGuess();
       }
     } else if (e.key === 'Backspace') {
-      setGuess(guess.slice(0, -1));
+      setGuess(prev => prev.slice(0, -1));
     } else if (/^[a-zA-Z]$/.test(e.key) && guess.length < 5) {
-      setGuess(guess + e.key.toLowerCase());
+      setGuess(prev => prev + e.key.toLowerCase());
     }
-  };
+  }, [gameStatus, submitGuess]); // guess not needed because we use functional updater
 
   const resetGame = () => {
     initGame();
@@ -188,6 +189,12 @@ const useGameLogic = (mode = 'termo') => {
     }
     return Math.max(0, minAttempts);
   };
+
+  // Keyboard listener for physical keyboard
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [handleKeyPress]);
 
   return {
     words,

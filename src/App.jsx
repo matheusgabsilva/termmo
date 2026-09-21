@@ -27,12 +27,6 @@ function App() {
     getRemainingAttempts
   } = useGameLogic(mode);
 
-  // Add keyboard listener for physical keyboard
-  React.useEffect(() => {
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [handleKeyPress]);
-
   // Determine mode label
   const modeLabels = {
     termo: 'Termo (1 tabuleiro)',
