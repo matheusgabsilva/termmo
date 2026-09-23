@@ -1,133 +1,91 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import useGameLogic from './hooks/useGameLogic';
 import Board from './components/Board';
 import Keyboard from './components/Keyboard';
 import Header from './components/Header';
 
 function App() {
-  const [mode, setMode] = React.useState('termo'); // termo, dueto, quarteto
+  const [mode, setMode] = React.useState('termo');
 
   const {
-    words,
-    targetWords,
-    targetWordsOriginal,
-    guesses,
-    currentRows,
-    gameStatus,
-    usedLetters,
-    guess,
-    setGuess,
-    submitGuess,
-    handleKeyPress,
-    resetGame,
-    invalidWord,
-    solvedBoards,
-    numBoards,
-    maxAttempts,
-    getRemainingAttempts
+    targetWords, targetWordsOriginal, guesses, currentRows,
+    gameStatus, usedLetters, guess, handleKeyPress, resetGame,
+    invalidWord, solvedBoards, numBoards, maxAttempts, getRemainingAttempts,
   } = useGameLogic(mode);
 
-  // Determine mode label
-  const modeLabels = {
-    termo: 'Termo (1 tabuleiro)',
-    dueto: 'Dueto (2 tabuleiros)',
-    quarteto: 'Quarteto (4 tabuleiros)'
-  };
+  // Padrão "latest ref": registra o listener UMA VEZ, mas sempre chama a versão atual
+  const handleKeyRef = useRef(handleKeyPress);
+  useEffect(() => { handleKeyRef.current = handleKeyPress; });
+
+  useEffect(() => {
+    const handler = (e) => handleKeyRef.current(e);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []); // [] = registra só uma vez
+
+  const gridCols =
+    numBoards === 1 ? 'grid-cols-1' :
+    numBoards === 2 ? 'grid-cols-1 sm:grid-cols-2' :
+                     'grid-cols-2';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header
-        mode={mode}
-        setMode={setMode}
-        modeLabels={modeLabels}
-        resetGame={resetGame}
-        gameStatus={gameStatus}
-      />
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="space-y-6">
-          {/* Game Boards */}
-          <div className="space-y-4">
-            {/* Responsive grid layout based on mode and screen size */}
-            <div className={
-              `grid gap-4 ` +
-              (mode === 'dueto'    ? 'grid-cols-1 md:grid-cols-2' : '') +
-              (mode === 'quarteto' ? 'grid-cols-2 lg:grid-cols-4' : '') +
-              (mode === 'termo'    ? 'grid-cols-1' : '')
-            }>
-              {targetWordsOriginal.map((targetWordOriginal, boardIndex) => (
-                <Board
-                  key={boardIndex}
-                  boardIndex={boardIndex}
-                  targetWord={targetWords[boardIndex]}
-                  targetWordOriginal={targetWordOriginal}
-                  guesses={guesses[boardIndex]}
-                  currentRow={currentRows[boardIndex]}
-                  guess={guess}
-                  words={words}
-                  handleKeyPress={handleKeyPress}
-                  setGuess={setGuess}
-                  submitGuess={submitGuess}
-                  solvedBoard={solvedBoards[boardIndex]}
-                  maxAttempts={maxAttempts}
-                  invalidWord={invalidWord}
-                />
-              ))}
-            </div>
-          </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <Header mode={mode} setMode={setMode} resetGame={resetGame} gameStatus={gameStatus} />
 
-          {/* Virtual Keyboard */}
-          <div className="mt-6">
-            <Keyboard usedLetters={usedLetters} handleKeyPress={handleKeyPress} />
-          </div>
+      <main className="flex-1 flex flex-col items-center px-4 py-6 gap-6">
 
-          {/* Game Status & Info */}
-          {gameStatus !== 'playing' && (
-            <div className="text-center py-8">
+        <div className={`grid ${gridCols} gap-6 w-full max-w-3xl justify-items-center`}>
+          {targetWords.map((targetWord, bi) => (
+            <Board
+              key={bi}
+              targetWord={targetWord}
+              guesses={guesses[bi] || []}
+              currentRow={currentRows[bi]}
+              guess={guess}
+              solvedBoard={solvedBoards[bi]}
+              maxAttempts={maxAttempts}
+              invalidWord={invalidWord && !solvedBoards[bi]}
+            />
+          ))}
+        </div>
+
+        {gameStatus === 'playing' && numBoards > 1 && (
+          <p className="text-sm text-gray-500">
+            Tentativas restantes: <strong>{getRemainingAttempts()}</strong>
+          </p>
+        )}
+
+        <div className="w-full max-w-lg">
+          <Keyboard usedLetters={usedLetters} handleKeyPress={handleKeyPress} />
+        </div>
+
+        {gameStatus !== 'playing' && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 max-w-sm w-full mx-4">
               {gameStatus === 'won' ? (
-                <div className="space-y-4">
-                  <div className="text-green-600">
-                    <p className="text-2xl font-bold">Parabéns! Você venceu!</p>
-                    <p className="text-lg">
-                      {numBoards === 1 ?
-                        `A palavra era: ${targetWordsOriginal[0].toUpperCase()}` :
-                        `As palavras eram: ${targetWordsOriginal.map(w => w.toUpperCase()).join(', ')}`
-                      }
-                    </p>
-                    {/* Celebration emojis for win */}
-                    <div className="text-4xl mt-2">🎉🏆✨</div>
-                  </div>
-                </div>
+                <>
+                  <div className="text-5xl">🎉</div>
+                  <h2 className="text-2xl font-bold text-green-600">Você venceu!</h2>
+                </>
               ) : (
-                <div className="space-y-4">
-                  <div className="text-red-600">
-                    <p className="text-2xl font-bold">Game Over!</p>
-                    <p className="text-lg">
-                      {numBoards === 1 ?
-                        `A palavra era: ${targetWordsOriginal[0].toUpperCase()}` :
-                        `As palavras eram: ${targetWordsOriginal.map(w => w.toUpperCase()).join(', ')}`
-                      }
-                    </p>
-                    {/* Sad emojis for loss */}
-                    <div className="text-4xl mt-2">😔💔</div>
-                  </div>
-                </div>
+                <>
+                  <div className="text-5xl">😔</div>
+                  <h2 className="text-2xl font-bold text-red-600">Que pena!</h2>
+                </>
               )}
+              <p className="text-gray-600 text-center text-sm">
+                {numBoards === 1 ? 'A palavra era: ' : 'As palavras eram: '}
+                <strong>{targetWordsOriginal.map(w => w.toUpperCase()).join(', ')}</strong>
+              </p>
               <button
                 onClick={resetGame}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+                className="mt-2 px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors w-full"
               >
                 Jogar Novamente
               </button>
             </div>
-          )}
-
-          {/* Attempts counter */}
-          {!gameStatus && numBoards > 1 && (
-            <div className="text-center text-sm text-gray-500">
-              Tentativas restantes: {getRemainingAttempts()}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </main>
     </div>
   );

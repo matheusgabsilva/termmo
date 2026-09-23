@@ -1,9 +1,8 @@
-// Utility functions for text normalization
 const removeAccents = (str) => {
   return str
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
-    .toUpperCase();
+    .toLowerCase();
 };
 
 export { removeAccents };

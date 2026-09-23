@@ -1,50 +1,39 @@
 import React from 'react';
 
+const ROWS = [
+  ['Q','W','E','R','T','Y','U','I','O','P'],
+  ['A','S','D','F','G','H','J','K','L'],
+  ['ENTER','Z','X','C','V','B','N','M','⌫'],
+];
+
+const STATUS_CLS = {
+  correct: 'bg-green-500  text-white border-green-500',
+  present: 'bg-yellow-500 text-white border-yellow-500',
+  absent:  'bg-gray-500   text-white border-gray-500',
+  default: 'bg-gray-200   text-gray-800 border-gray-300',
+};
+
 const Keyboard = ({ usedLetters, handleKeyPress }) => {
-  const keyboardLayout = [
-    ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-    ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
-    ['Enter', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '←']
-  ];
+  const onKey = (key) => {
+    if (key === 'ENTER') handleKeyPress({ key: 'Enter' });
+    else if (key === '⌫') handleKeyPress({ key: 'Backspace' });
+    else handleKeyPress({ key: key.toLowerCase() });
+  };
 
   return (
-    <div className="space-y-2">
-      {keyboardLayout.map((row, rowIndex) => (
-        <div key={rowIndex} className="flex flex-wrap justify-center space-x-1">
-          {row.map((key, keyIndex) => {
-            const isWide = key === 'Enter' || key === '←';
-            const letter = key.toLowerCase();
-            const status = usedLetters[letter];
-
-            let bgColor = 'bg-gray-200';
-            let textColor = 'text-gray-800';
-
-            if (status === 'correct') {
-              bgColor = 'bg-green-500';
-              textColor = 'text-white';
-            } else if (status === 'present') {
-              bgColor = 'bg-yellow-500';
-              textColor = 'text-white';
-            } else if (status === 'absent') {
-              bgColor = 'bg-gray-500';
-              textColor = 'text-white';
-            }
-
-            const handleClick = () => {
-              if (key === 'Enter') {
-                handleKeyPress({ key: 'Enter' });
-              } else if (key === '←') {
-                handleKeyPress({ key: 'Backspace' });
-              } else {
-                handleKeyPress({ key });
-              }
-            };
-
+    <div className="flex flex-col items-center gap-1 w-full max-w-lg mx-auto select-none">
+      {ROWS.map((row, ri) => (
+        <div key={ri} className="flex gap-1 justify-center w-full">
+          {row.map((key) => {
+            const isWide = key === 'ENTER' || key === '⌫';
+            const cls    = STATUS_CLS[usedLetters[key.toLowerCase()] || 'default'];
             return (
               <button
-                key={`${rowIndex}-${keyIndex}`}
-                onClick={handleClick}
-                className={`flex-1 min-w-[2.5rem] h-10 flex items-center justify-center rounded font-semibold ${bgColor} ${textColor} hover:opacity-90 transition-colors`}
+                key={key}
+                onClick={() => onKey(key)}
+                className={`flex items-center justify-center h-14 rounded border
+                            font-semibold text-sm transition-colors active:scale-95
+                            ${isWide ? 'px-3 min-w-[3.5rem]' : 'w-9 sm:w-10'} ${cls}`}
               >
                 {key}
               </button>

@@ -1,48 +1,76 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { removeAccents } from '../utils/normalize.js';
 import wordsData from '../data/words.json';
 
-const useGameLogic = (mode = 'termo') => {
-  // Mode configuration: { boards, maxAttempts }
-  const modeConfig = {
-    termo: { boards: 1, maxAttempts: 6 },
-    dueto: { boards: 2, maxAttempts: 7 },
-    quarteto: { boards: 4, maxAttempts: 9 }
-  };
+const NORMALIZED_RESPOSTAS = wordsData.respostas.map(removeAccents);
+const NORMALIZED_VALIDAS   = wordsData.validas.map(removeAccents);
 
+const useGameLogic = (mode = 'termo') => {
+  const modeConfig = {
+    termo:    { boards: 1, maxAttempts: 6 },
+    dueto:    { boards: 2, maxAttempts: 7 },
+    quarteto: { boards: 4, maxAttempts: 9 },
+  };
   const { boards: numBoards, maxAttempts } = modeConfig[mode] || modeConfig.termo;
 
-  const [words, setWords] = useState(wordsData);
-  const [targetWords, setTargetWords] = useState([]); // Array of target words (without accents)
-  const [targetWordsOriginal, setTargetWordsOriginal] = useState([]); // Array of target words (with original accents for display)
-  const [guesses, setGuesses] = useState(Array(numBoards).fill().map(() => Array(maxAttempts).fill(''))); // [board][attempt]
-  const [currentRows, setCurrentRows] = useState(Array(numBoards).fill(0)); // Current row for each board
-  const [gameStatus, setGameStatus] = useState('playing'); // playing, won, lost
-  const [usedLetters, setUsedLetters] = useState({}); // { letter: status } - aggregated across all boards
-  const [guess, setGuess] = useState('');
-  const [invalidWord, setInvalidWord] = useState(false);
-  const [solvedBoards, setSolvedBoards] = useState(Array(numBoards).fill(false)); // Which boards are solved
+  const [targetWords,         setTargetWords]         = useState([]);
+  const [targetWordsOriginal, setTargetWordsOriginal] = useState([]);
+  const [guesses,             setGuesses]             = useState([]);
+  const [currentRows,         setCurrentRows]         = useState([]);
+  const [gameStatus,          setGameStatus]          = useState('playing');
+  const [usedLetters,         setUsedLetters]         = useState({});
+  const [guess,               setGuess]               = useState('');
+  const [invalidWord,         setInvalidWord]         = useState(false);
+  const [solvedBoards,        setSolvedBoards]        = useState([]);
 
-  // Initialize game with random words
+  // Refs para acessar estado atual dentro de callbacks sem stale closure
+  const stateRef = useRef({
+    gameStatus, guess, guesses, currentRows, solvedBoards, usedLetters, targetWords, numBoards, maxAttempts
+  });
+
+  // Keep refs in sync with state
   useEffect(() => {
-    initGame();
-  }, [mode, numBoards, maxAttempts]);
+    stateRef.current.gameStatus = gameStatus;
+  }, [gameStatus]);
+
+  useEffect(() => {
+    stateRef.current.guess = guess;
+  }, [guess]);
+
+  useEffect(() => {
+    stateRef.current.guesses = guesses;
+  }, [guesses]);
+
+  useEffect(() => {
+    stateRef.current.currentRows = currentRows;
+  }, [currentRows]);
+
+  useEffect(() => {
+    stateRef.current.solvedBoards = solvedBoards;
+  }, [solvedBoards]);
+
+  useEffect(() => {
+    stateRef.current.usedLetters = usedLetters;
+  }, [usedLetters]);
+
+  useEffect(() => {
+    stateRef.current.targetWords = targetWords;
+  }, [targetWords]);
+
+  useEffect(() => { initGame(); }, [mode]);
 
   const initGame = () => {
-    // Select random words from respostas
-    const selectedTargetWords = [];
-    const selectedTargetWordsOriginal = [];
-
+    const pool = [...wordsData.respostas];
+    const targets = [], targetsOrig = [];
     for (let i = 0; i < numBoards; i++) {
-      const randomIndex = Math.floor(Math.random() * words.respostas.length);
-      const selectedWord = words.respostas[randomIndex];
-      selectedTargetWords.push(removeAccents(selectedWord));
-      selectedTargetWordsOriginal.push(selectedWord);
+      const idx = Math.floor(Math.random() * pool.length);
+      targetsOrig.push(pool[idx]);
+      targets.push(removeAccents(pool[idx]));
+      pool.splice(idx, 1);
     }
-
-    setTargetWords(selectedTargetWords);
-    setTargetWordsOriginal(selectedTargetWordsOriginal);
-    setGuesses(Array(numBoards).fill().map(() => Array(maxAttempts).fill('')));
+    setTargetWords(targets);
+    setTargetWordsOriginal(targetsOrig);
+    setGuesses(Array.from({ length: numBoards }, () => []));
     setCurrentRows(Array(numBoards).fill(0));
     setGameStatus('playing');
     setUsedLetters({});
@@ -52,168 +80,109 @@ const useGameLogic = (mode = 'termo') => {
   };
 
   const submitGuess = () => {
+    const { gameStatus, guess, guesses, currentRows, solvedBoards, usedLetters, targetWords, numBoards, maxAttempts } = stateRef.current;
+
     if (gameStatus !== 'playing') return;
+    if (guess.length !== 5) return;
 
-    const normalizedGuess = removeAccents(guess.toLowerCase());
+    const normalizedGuess = removeAccents(guess);
 
-    // Check if word is valid
-    const isValid = words.validas.includes(normalizedGuess) || words.respostas.includes(normalizedGuess);
+    const isValid =
+      NORMALIZED_RESPOSTAS.includes(normalizedGuess) ||
+      NORMALIZED_VALIDAS.includes(normalizedGuess);
 
     if (!isValid) {
       setInvalidWord(true);
-      // Reset after shake animation completes
-      setTimeout(() => setInvalidWord(false), 500);
+      setTimeout(() => setInvalidWord(false), 600);
       return;
     }
 
-    // Process guess for each active (unsolved) board
-    const newGuesses = [...guesses];
-    const newCurrentRows = [...currentRows];
+    const newGuesses      = guesses.map(b => [...b]);
+    const newCurrentRows  = [...currentRows];
     const newSolvedBoards = [...solvedBoards];
-    const newUsedLetters = { ...usedLetters };
+    const newUsedLetters  = { ...usedLetters };
 
-    let anyBoardUpdated = false;
+    for (let bi = 0; bi < numBoards; bi++) {
+      if (newSolvedBoards[bi]) continue;
+      if (newCurrentRows[bi] >= maxAttempts) continue;
 
-    for (let boardIndex = 0; boardIndex < numBoards; boardIndex++) {
-      // Skip if board is already solved
-      if (solvedBoards[boardIndex]) continue;
+      const target   = targetWords[bi];
+      const statuses = Array(5).fill('absent');
+      const counts   = {};
+      for (const ch of target) counts[ch] = (counts[ch] || 0) + 1;
 
-      // Skip if we've used all attempts for this board
-      if (currentRows[boardIndex] >= maxAttempts) continue;
-
-      anyBoardUpdated = true;
-
-      const targetWord = targetWords[boardIndex];
-
-      // Calculate letter statuses for this board
-      const letterStatuses = Array(5).fill('absent');
-      const wordLetterCounts = {};
-
-      // Count letters in target word for yellow/green logic
-      for (const letter of targetWord) {
-        wordLetterCounts[letter] = (wordLetterCounts[letter] || 0) + 1;
-      }
-
-      // First pass: check for correct letters (green)
       for (let i = 0; i < 5; i++) {
-        if (normalizedGuess[i] === targetWord[i]) {
-          letterStatuses[i] = 'correct';
-          wordLetterCounts[normalizedGuess[i]]--;
+        if (normalizedGuess[i] === target[i]) {
+          statuses[i] = 'correct';
+          counts[normalizedGuess[i]]--;
+        }
+      }
+      for (let i = 0; i < 5; i++) {
+        if (statuses[i] === 'absent' && counts[normalizedGuess[i]] > 0) {
+          statuses[i] = 'present';
+          counts[normalizedGuess[i]]--;
         }
       }
 
-      // Second pass: check for present letters (yellow)
       for (let i = 0; i < 5; i++) {
-        if (letterStatuses[i] === 'absent' && wordLetterCounts[normalizedGuess[i]] > 0) {
-          letterStatuses[i] = 'present';
-          wordLetterCounts[normalizedGuess[i]]--;
+        const ch = normalizedGuess[i], st = statuses[i], cur = newUsedLetters[ch];
+        if (!cur || st === 'correct' || (st === 'present' && cur === 'absent')) {
+          newUsedLetters[ch] = st;
         }
       }
 
-      // Update guesses for this board
-      newGuesses[boardIndex][currentRows[boardIndex]] = guess;
+      newGuesses[bi].push(guess);
 
-      // Update used letters with priority logic (across all boards)
-      for (let i = 0; i < 5; i++) {
-        const letter = normalizedGuess[i];
-        const status = letterStatuses[i];
-
-        // Priority: correct > present > absent
-        if (!newUsedLetters[letter] ||
-            (status === 'correct' && newUsedLetters[letter] !== 'correct') ||
-            (status === 'present' && newUsedLetters[letter] === 'absent')) {
-          newUsedLetters[letter] = status;
-        }
-      }
-
-      // Check if this board is now solved
-      if (normalizedGuess === targetWord) {
-        newSolvedBoards[boardIndex] = true;
+      if (normalizedGuess === target) {
+        newSolvedBoards[bi] = true;
       } else {
-        // Move to next row for this board
-        newCurrentRows[boardIndex] = currentRows[boardIndex] + 1;
+        newCurrentRows[bi]++;
       }
     }
 
-    // Only update state if we actually processed the guess
-    if (anyBoardUpdated) {
-      setGuesses(newGuesses);
-      setCurrentRows(newCurrentRows);
-      setUsedLetters(newUsedLetters);
-      setSolvedBoards(newSolvedBoards);
+    setGuesses(newGuesses);
+    setCurrentRows(newCurrentRows);
+    setUsedLetters(newUsedLetters);
+    setSolvedBoards(newSolvedBoards);
+    setGuess('');
 
-      // Check win/lose conditions
-      const allBoardsSolved = newSolvedBoards.every(solved => solved);
-      const attemptsExhausted = currentRows.some((row, index) =>
-        !solvedBoards[index] && row >= maxAttempts
-      );
+    const allWon  = newSolvedBoards.every(Boolean);
+    const anyLost = newCurrentRows.some((row, i) => !newSolvedBoards[i] && row >= maxAttempts);
 
-      if (allBoardsSolved) {
-        setGameStatus('won');
-      } else if (attemptsExhausted) {
-        setGameStatus('lost');
-      }
-
-      setGuess('');
-    }
+    if (allWon)       setGameStatus('won');
+    else if (anyLost) setGameStatus('lost');
   };
 
-  // handleKeyPress with functional updates to avoid stale closure
-  const handleKeyPress = useCallback((e) => {
+  const handleKeyPress = (e) => {
+    const { gameStatus, guess } = stateRef.current;
     if (gameStatus !== 'playing') return;
 
-    if (e.key === 'Enter') {
-      if (guess.length === 5) {
-        submitGuess();
-      }
-    } else if (e.key === 'Backspace') {
-      setGuess(prev => prev.slice(0, -1));
-    } else if (/^[a-zA-Z]$/.test(e.key) && guess.length < 5) {
-      setGuess(prev => prev + e.key.toLowerCase());
+    const key = e.key;
+    if (key === 'Enter') {
+      submitGuess();
+    } else if (key === 'Backspace') {
+      setGuess(g => g.slice(0, -1));
+    } else if (/^[a-zA-ZÀ-ÿ]$/.test(key) && guess.length < 5) {
+      setGuess(g => g + key.toLowerCase());
     }
-  }, [gameStatus, submitGuess]); // guess not needed because we use functional updater
-
-  const resetGame = () => {
-    initGame();
   };
 
-  // Calculate remaining attempts (minimum across all active boards)
   const getRemainingAttempts = () => {
-    let minAttempts = maxAttempts;
+    let min = maxAttempts;
     for (let i = 0; i < numBoards; i++) {
       if (!solvedBoards[i]) {
-        const attemptsUsed = currentRows[i];
-        const remaining = maxAttempts - attemptsUsed;
-        if (remaining < minAttempts) minAttempts = remaining;
+        const rem = maxAttempts - currentRows[i];
+        if (rem < min) min = rem;
       }
     }
-    return Math.max(0, minAttempts);
+    return Math.max(0, min);
   };
 
-  // Keyboard listener for physical keyboard
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [handleKeyPress]);
-
   return {
-    words,
-    targetWords,
-    targetWordsOriginal,
-    guesses,
-    currentRows,
-    gameStatus,
-    usedLetters,
-    guess,
-    setGuess,
-    submitGuess,
-    handleKeyPress,
-    resetGame,
-    invalidWord,
-    solvedBoards,
-    numBoards,
-    maxAttempts,
-    getRemainingAttempts
+    words: wordsData, targetWords, targetWordsOriginal, guesses, currentRows,
+    gameStatus, usedLetters, guess, setGuess, submitGuess, handleKeyPress,
+    resetGame: initGame, invalidWord, solvedBoards, numBoards, maxAttempts,
+    getRemainingAttempts,
   };
 };
 
